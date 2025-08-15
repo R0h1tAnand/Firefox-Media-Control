@@ -1,5 +1,9 @@
 # Firefox Global Media Controller
 
+<p align="center">
+  <img src="icons/icon.png" width="72" height="72" alt="Firefox Media Controller">
+</p>
+
 A Firefox extension that provides a unified media control interface for all tabs playing audio or video content. Similar to Chrome/Brave's media hub but designed specifically for Firefox.
 
 ## Features
