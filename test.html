@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Controller Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .media-container {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        video, audio {
+            width: 100%;
+            max-width: 600px;
+        }
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Firefox Media Controller Test Page</h1>
+    <p>This page contains various media elements to test the Global Media Controller extension.</p>
+
+    <div class="media-container">
+        <h2>HTML5 Video Test</h2>
+        <video controls>
+            <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4">
+            <p>Your browser doesn't support HTML5 video.</p>
+        </video>
+        <p>Big Buck Bunny sample video for testing video controls.</p>
+    </div>
+
+    <div class="media-container">
+        <h2>HTML5 Audio Test</h2>
+        <audio controls>
+            <source src="https://www.soundjay.com/misc/sounds/bell-ringing-05.wav" type="audio/wav">
+            <source src="https://file-examples.com/storage/feb68d8d1-2363-4d2b-a92d-5bbf1e3e9e6e/2017/11/file_example_MP3_700KB.mp3" type="audio/mpeg">
+            <p>Your browser doesn't support HTML5 audio.</p>
+        </audio>
+        <p>Sample audio file for testing audio controls.</p>
+    </div>
+
+    <div class="media-container">
+        <h2>YouTube Embed Test</h2>
+        <iframe width="560" height="315" 
+                src="https://www.youtube.com/embed/dQw4w9WgXcQ" 
+                title="YouTube video player" 
+                frameborder="0" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                allowfullscreen>
+        </iframe>
+        <p>Embedded YouTube video for testing iframe media detection.</p>
+    </div>
+
+    <div class="media-container">
+        <h2>Instructions</h2>
+        <ol>
+            <li>Install the Global Media Controller extension</li>
+            <li>Play one or more of the media elements above</li>
+            <li>Click the extension icon in the toolbar</li>
+            <li>Test the play/pause, seek, and volume controls</li>
+            <li>Try the keyboard shortcuts:
+                <ul>
+                    <li><strong>Ctrl+Shift+Space</strong>: Toggle play/pause</li>
+                    <li><strong>Ctrl+Shift+,</strong>: Seek backward 10s</li>
+                    <li><strong>Ctrl+Shift+.</strong>: Seek forward 10s</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+
+    <script>
+        // Set up Media Session API metadata for testing
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: 'Test Media Title',
+                artist: 'Test Artist',
+                album: 'Test Album',
+                artwork: [
+                    { src: 'https://via.placeholder.com/96', sizes: '96x96', type: 'image/png' },
+                    { src: 'https://via.placeholder.com/128', sizes: '128x128', type: 'image/png' },
+                    { src: 'https://via.placeholder.com/192', sizes: '192x192', type: 'image/png' },
+                    { src: 'https://via.placeholder.com/256', sizes: '256x256', type: 'image/png' },
+                ]
+            });
+        }
+
+        // Log media events for debugging
+        document.addEventListener('play', (e) => {
+            console.log('Media started playing:', e.target);
+        }, true);
+
+        document.addEventListener('pause', (e) => {
+            console.log('Media paused:', e.target);
+        }, true);
+    </script>
+</body>
+</html>

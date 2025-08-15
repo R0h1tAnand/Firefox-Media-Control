@@ -1,0 +1,410 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    color: #fff;
+    background: #1c1c1c;
+    width: 380px;
+    min-height: 200px;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Header */
+.header {
+    background: #1c1c1c;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.header-icon {
+    width: 24px;
+    height: 24px;
+}
+
+.header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toggle-label {
+    font-size: 12px;
+    color: #cfcfcf;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 20px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #007bff;
+}
+
+input:checked + .slider:before {
+    transform: translateX(20px);
+}
+
+/* Content */
+.content {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 400px;
+}
+
+.sessions-list {
+    padding: 12px;
+}
+
+/* Session Card */
+.session-card {
+    background: #282828;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    padding: 12px;
+    transition: box-shadow 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    will-change: box-shadow;
+}
+
+.session-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.session-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.session-artwork {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    background: #383838;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.session-artwork img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.session-artwork-fallback {
+    font-size: 20px;
+    color: #999;
+}
+
+.session-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.session-title {
+    font-weight: 500;
+    color: #fff;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 13px;
+}
+
+.session-site {
+    font-size: 12px;
+    color: #9f9f9f;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.session-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.control-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 50%;
+    border: none;
+    background: #383838;
+    color: #fff;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+/* Make seek +/-10 icons more visible: slightly larger, bolder strokes and numbers */
+.control-btn.seek-btn {
+    padding: 4px; /* breathing room */
+    width: 40px;
+    height: 40px;
+    background: transparent; /* let the SVG circle provide the visible background */
+}
+
+.control-btn.seek-btn svg {
+    width: 28px;
+    height: 28px;
+    display: block;
+}
+
+/* Ensure the circle background and icon shapes inherit the button color */
+.control-btn.seek-btn svg circle {
+    fill: rgba(255,255,255,0.06);
+}
+
+.control-btn.seek-btn svg path,
+.control-btn.seek-btn svg text {
+    fill: currentColor !important;
+}
+
+.control-btn:hover { 
+    background: #404040;
+    transform: scale(1.05);
+}
+
+.control-btn:active { 
+    transform: scale(0.95);
+    background: #484848;
+}
+
+.control-btn.primary {
+    width: 38px;
+    height: 38px;
+    background: #4f4f4f;
+    color: white;
+    border-radius: 50%;
+}
+
+.control-btn.primary:hover {
+    background: #606060;
+}
+
+.seek-btn { font-size: 12px; }
+
+.progress-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #fff;
+    border-radius: 2px;
+    transition: width 0.1s ease;
+    pointer-events: none;
+}
+
+.progress-handle {
+    position: absolute;
+    top: -4px;
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    transform: translateX(-50%);
+    cursor: grab;
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 10;
+}
+
+.progress-handle:active {
+    cursor: grabbing;
+    transform: translateX(-50%) scale(1.2);
+}
+
+.progress-bar:hover .progress-handle {
+    opacity: 1;
+}
+
+.progress-bar.dragging .progress-handle {
+    opacity: 1;
+    transition: none;
+}
+
+.progress-bar.dragging .progress-fill {
+    transition: none;
+}
+
+.time-display {
+    font-size: 11px;
+    color: #9f9f9f;
+    font-variant-numeric: tabular-nums;
+    min-width: 35px;
+}
+
+.session-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.volume-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.volume-slider {
+    width: 60px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 10px;
+    height: 10px;
+    background: #fff;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.volume-slider::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    background: #fff;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    transition: transform 0.2s ease;
+}
+
+.volume-slider::-webkit-slider-thumb:hover,
+.volume-slider::-moz-range-thumb:hover {
+    transform: scale(1.2);
+}
+
+.open-tab-btn {
+    font-size: 16px;
+    padding: 4px 6px;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+}
+
+.empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.empty-state p {
+    font-size: 16px;
+    margin-bottom: 8px;
+}
+
+.empty-state small {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+/* Utility classes */
+.hidden {
+    display: none !important;
+}
+
+.paused {
+    opacity: 0.7;
+}
+
+.muted .volume-control {
+    opacity: 0.5;
+}

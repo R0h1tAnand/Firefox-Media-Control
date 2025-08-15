@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Media Controller</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-title">
+                <img src="icons/icon.png" alt="Media Controller" class="header-icon">
+                <h1>Now Playing</h1>
+            </div>
+            <div class="header-controls">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="allWindowsToggle">
+                    <span class="slider"></span>
+                </label>
+                <span class="toggle-label">All windows</span>
+            </div>
+        </header>
+
+        <div class="content">
+            <div id="sessionsList" class="sessions-list"></div>
+            
+            <div id="emptyState" class="empty-state">
+                <div class="empty-icon">🎵</div>
+                <p>No media playing</p>
+                <small>Start a video or audio in any tab</small>
+            </div>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

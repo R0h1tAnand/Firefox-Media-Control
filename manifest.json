@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Global Media Controller",
+  "version": "0.1.0",
+  "description": "Control media playback across all tabs from a single toolbar popup",
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+  "16": "icons/icon.png",
+  "32": "icons/icon.png",
+  "48": "icons/icon.png",
+  "128": "icons/icon.png"
+    }
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "host_permissions": ["<all_urls>"],
+  "permissions": ["tabs", "scripting", "storage", "activeTab"],
+  "commands": {
+    "toggle-play": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Space"
+      },
+      "description": "Toggle play/pause of most recent session"
+    },
+    "seek-forward": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Period"
+      },
+      "description": "Seek +10s"
+    },
+    "seek-backward": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Comma"
+      },
+      "description": "Seek -10s"
+    }
+  },
+  "icons": {
+  "16": "icons/icon.png",
+  "32": "icons/icon.png",
+  "48": "icons/icon.png",
+  "128": "icons/icon.png"
+  }
+}
