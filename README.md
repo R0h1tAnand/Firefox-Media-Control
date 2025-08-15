@@ -6,6 +6,14 @@
 
 A Firefox extension that provides a unified media control interface for all tabs playing audio or video content. Similar to Chrome/Brave's media hub but designed specifically for Firefox.
 
+
+
+
+
+
+
+
+
 ## Features
 
 - **Centralized Control**: Control all playing media from a single toolbar popup
