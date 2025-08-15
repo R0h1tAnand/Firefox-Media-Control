@@ -1,12 +1,17 @@
 # Firefox Global Media Controller
 
 <p align="center">
-  <img src="icons/icon.png" width="200" height="200" align="left" alt="Firefox Media Controller">
+  <img src="icons/icon.png" width="200" height="200" alt="Firefox Media Controller">
 </p>
 
 A Firefox extension that provides a unified media control interface for all tabs playing audio or video content. Similar to Chrome/Brave's media hub but designed specifically for Firefox.
+## Features
 
-
+- **Centralized Control**: Control all playing media from a single toolbar popup  
+- **Universal Compatibility**: Works with YouTube, Spotify Web, SoundCloud, podcasts, and any HTML5 media  
+- **Rich Controls**: Play/pause, seek ±10s, scrubber bar, volume/mute, and tab navigation  
+- **Keyboard Shortcuts**: Global shortcuts for play/pause and seeking  
+- **Real-time Updates**: Live progress tracking and state synchronization  
 
 
 
