@@ -4,20 +4,38 @@
   "version": "0.1.0",
   "description": "Control media playback across all tabs from a single toolbar popup",
   "homepage_url": "https://github.com/R0h1tAnand/Firefox-Media-Control",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "global-media-controller@rohitanand.dev",
+      "strict_min_version": "142.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
+    }
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
-  "16": "icons/icon.png",
-  "32": "icons/icon.png",
-  "48": "icons/icon.png",
-  "128": "icons/icon.png"
+      "48": "icons/icon-48.png",
+      "96": "icons/icon-96.png"
     }
   },
   "background": {
-    "scripts": ["background.js"]
+    "scripts": [
+      "background.js"
+    ]
   },
-  "host_permissions": ["<all_urls>"],
-  "permissions": ["tabs", "scripting", "storage", "activeTab"],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "permissions": [
+    "tabs",
+    "scripting",
+    "storage",
+    "activeTab"
+  ],
   "commands": {
     "toggle-play": {
       "suggested_key": {
@@ -39,9 +57,7 @@
     }
   },
   "icons": {
-  "16": "icons/icon.png",
-  "32": "icons/icon.png",
-  "48": "icons/icon.png",
-  "128": "icons/icon.png"
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png"
   }
 }
