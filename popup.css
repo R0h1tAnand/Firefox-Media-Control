@@ -1,3 +1,17 @@
+:root {
+    --bg-color: #121212;
+    /* Spotify Dark */
+    --card-bg: #181818;
+    --card-hover: #282828;
+    --text-primary: #ffffff;
+    --text-secondary: #b3b3b3;
+    --accent: #1db954;
+    /* Spotify Green */
+    --accent-hover: #1ed760;
+    --border-radius: 8px;
+    --transition-speed: 0.2s;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -5,63 +19,73 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Circular', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     font-size: 14px;
-    color: #fff;
-    background: #1c1c1c;
-    width: 380px;
+    color: var(--text-primary);
+    background: var(--bg-color);
+    width: 400px;
+    /* Slightly wider for better layout */
     min-height: 200px;
+    user-select: none;
+    overflow-x: hidden;
 }
 
 .container {
     display: flex;
     flex-direction: column;
     height: 100%;
+    padding-bottom: 8px;
 }
 
 /* Header */
 .header {
-    background: #1c1c1c;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 16px;
+    background: rgba(18, 18, 18, 0.95);
+    padding: 16px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .header-title {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
 }
 
 .header-icon {
     width: 24px;
     height: 24px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
 .header h1 {
     font-size: 16px;
-    font-weight: 600;
-    color: #ffffff;
+    font-weight: 700;
+    letter-spacing: -0.02em;
 }
 
 .header-controls {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
 }
 
 .toggle-label {
     font-size: 12px;
-    color: #cfcfcf;
+    font-weight: 600;
+    color: var(--text-secondary);
 }
 
 /* Toggle Switch */
 .toggle-switch {
     position: relative;
     display: inline-block;
-    width: 40px;
+    width: 36px;
     height: 20px;
 }
 
@@ -78,8 +102,8 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #ccc;
-    transition: .4s;
+    background-color: #535353;
+    transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 20px;
 }
 
@@ -91,103 +115,151 @@ body {
     left: 2px;
     bottom: 2px;
     background-color: white;
-    transition: .4s;
+    transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-input:checked + .slider {
-    background-color: #007bff;
+input:checked+.slider {
+    background-color: var(--accent);
 }
 
-input:checked + .slider:before {
-    transform: translateX(20px);
+input:checked+.slider:before {
+    transform: translateX(16px);
 }
 
 /* Content */
 .content {
     flex: 1;
     overflow-y: auto;
-    max-height: 400px;
+    padding: 8px 16px;
 }
 
-.sessions-list {
-    padding: 12px;
+.content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 /* Session Card */
 .session-card {
-    background: #282828;
-    border-radius: 12px;
-    margin-bottom: 12px;
+    background: var(--card-bg);
+    border-radius: 10px;
+    margin-bottom: 10px;
     padding: 12px;
-    transition: box-shadow 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    will-change: box-shadow;
+    transition: background-color 0.2s ease;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
+    overflow: hidden;
 }
 
 .session-card:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    background: var(--card-hover);
 }
+
+
 
 .session-header {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
+    position: relative;
+    z-index: 1;
 }
 
 .session-artwork {
     width: 48px;
     height: 48px;
-    border-radius: 8px;
-    background: #383838;
+    border-radius: 6px;
+    background: #282828;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
     flex-shrink: 0;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .session-artwork img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    border-radius: 8px;
 }
 
 .session-artwork-fallback {
-    font-size: 20px;
-    color: #999;
+    font-size: 32px;
+    color: #535353;
 }
 
 .session-info {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.session-site-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    opacity: 0.7;
+}
+
+.session-site-icon {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+}
+
+.session-site {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
 }
 
 .session-title {
-    font-weight: 500;
-    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
     margin-bottom: 4px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 13px;
+    line-height: 1.3;
 }
 
-.session-site {
-    font-size: 12px;
-    color: #9f9f9f;
+/* Create a "scrolling" effect for long titles on hover could be cool, but text-overflow is safe */
+.session-artist {
+    font-size: 13px;
+    color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
+
+/* Controls */
 .session-controls {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 10px;
 }
 
 .control-btn {
@@ -196,215 +268,234 @@ input:checked + .slider:before {
     padding: 0;
     border-radius: 50%;
     border: none;
-    background: #383838;
-    color: #fff;
+    background: transparent;
+    color: var(--text-secondary);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
-    font-size: 14px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Make seek +/-10 icons more visible: slightly larger, bolder strokes and numbers */
-.control-btn.seek-btn {
-    padding: 4px; /* breathing room */
-    width: 40px;
-    height: 40px;
-    background: transparent; /* let the SVG circle provide the visible background */
+.control-btn svg {
+    fill: currentColor;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
 }
 
-.control-btn.seek-btn svg {
-    width: 28px;
-    height: 28px;
-    display: block;
+.control-btn:hover {
+    color: var(--text-primary);
+    transform: scale(1.1);
 }
 
-/* Ensure the circle background and icon shapes inherit the button color */
-.control-btn.seek-btn svg circle {
-    fill: rgba(255,255,255,0.06);
-}
-
-.control-btn.seek-btn svg path,
-.control-btn.seek-btn svg text {
-    fill: currentColor !important;
-}
-
-.control-btn:hover { 
-    background: #404040;
-    transform: scale(1.05);
-}
-
-.control-btn:active { 
+.control-btn:active {
     transform: scale(0.95);
-    background: #484848;
+    color: var(--text-secondary);
 }
 
+/* Primary Play/Pause Button */
 .control-btn.primary {
-    width: 38px;
-    height: 38px;
-    background: #4f4f4f;
-    color: white;
-    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    background: var(--text-primary);
+    color: var(--bg-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .control-btn.primary:hover {
-    background: #606060;
+    transform: scale(1.05);
+    /* Enlarge */
+    background: var(--text-primary);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
 }
 
-.seek-btn { font-size: 12px; }
+.control-btn.primary:active {
+    transform: scale(0.92);
+}
 
+/* Progress Bar */
 .progress-container {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .progress-bar {
     flex: 1;
     height: 4px;
-    background: rgba(255, 255, 255, 0.1);
+    background: #535353;
     border-radius: 2px;
     position: relative;
     cursor: pointer;
-    user-select: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    overflow: hidden;
+    overflow: visible;
+    /* Allow handle to pop out */
+}
+
+/* Hit area enhancement */
+.progress-bar::after {
+    content: '';
+    position: absolute;
+    top: -10px;
+    bottom: -10px;
+    left: 0;
+    right: 0;
 }
 
 .progress-fill {
     height: 100%;
-    background: #fff;
+    background: var(--text-primary);
+    /* White progress by default */
     border-radius: 2px;
-    transition: width 0.1s ease;
-    pointer-events: none;
+    width: 0%;
+    transition: width 0.1s linear;
+    /* Smooth linear update for progress */
+}
+
+.session-card:hover .progress-fill {
+    background: var(--accent);
+    /* Turn green on hover like Spotify */
 }
 
 .progress-handle {
     position: absolute;
-    top: -4px;
+    top: 50%;
+    left: 0%;
     width: 12px;
     height: 12px;
     background: #fff;
     border-radius: 50%;
-    transform: translateX(-50%);
-    cursor: grab;
-    opacity: 0;
-    transition: opacity 0.2s ease, transform 0.2s ease;
-    z-index: 10;
-}
-
-.progress-handle:active {
-    cursor: grabbing;
-    transform: translateX(-50%) scale(1.2);
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 0.1s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
 }
 
 .progress-bar:hover .progress-handle {
-    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
 }
 
 .progress-bar.dragging .progress-handle {
-    opacity: 1;
-    transition: none;
-}
-
-.progress-bar.dragging .progress-fill {
+    transform: translate(-50%, -50%) scale(1.2);
     transition: none;
 }
 
 .time-display {
     font-size: 11px;
-    color: #9f9f9f;
+    color: var(--text-secondary);
+    min-width: 40px;
+    text-align: center;
     font-variant-numeric: tabular-nums;
-    min-width: 35px;
 }
 
+/* Footer / Volume */
 .session-footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding-top: 8px;
+    /* Breathing room */
 }
 
 .volume-control {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    flex: 1;
+    max-width: 120px;
+}
+
+.volume-icon {
+    color: var(--text-secondary);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.volume-icon:hover {
+    color: var(--text-primary);
 }
 
 .volume-slider {
-    width: 60px;
-    height: 3px;
-    background: rgba(255, 255, 255, 0.1);
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: #535353;
     border-radius: 2px;
     outline: none;
-    cursor: pointer;
 }
 
 .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
     appearance: none;
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
     background: #fff;
     border-radius: 50%;
     cursor: pointer;
-    transition: transform 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    transition: opacity 0.2s;
 }
 
-.volume-slider::-moz-range-thumb {
-    width: 10px;
-    height: 10px;
-    background: #fff;
-    border-radius: 50%;
-    cursor: pointer;
-    border: none;
-    transition: transform 0.2s ease;
-}
-
-.volume-slider::-webkit-slider-thumb:hover,
-.volume-slider::-moz-range-thumb:hover {
-    transform: scale(1.2);
+.volume-control:hover .volume-slider::-webkit-slider-thumb {
+    opacity: 1;
 }
 
 .open-tab-btn {
+    opacity: 0;
+    transform: translateX(10px);
+    transition: all 0.3s ease;
+    color: var(--text-secondary);
+    background: transparent;
     font-size: 16px;
-    padding: 4px 6px;
+    padding: 6px;
+}
+
+.session-card:hover .open-tab-btn {
+    opacity: 1;
+    transform: translateX(0);
 }
 
 /* Empty State */
 .empty-state {
     text-align: center;
-    padding: 40px 20px;
-    color: #666;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
 }
 
 .empty-icon {
     font-size: 48px;
-    margin-bottom: 16px;
+    margin-bottom: 20px;
     opacity: 0.5;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
+
+    100% {
+        transform: translateY(0px);
+    }
 }
 
 .empty-state p {
     font-size: 16px;
+    font-weight: 700;
     margin-bottom: 8px;
+    color: var(--text-primary);
 }
 
-.empty-state small {
-    font-size: 12px;
-    opacity: 0.7;
-}
-
-/* Utility classes */
 .hidden {
     display: none !important;
-}
-
-.paused {
-    opacity: 0.7;
-}
-
-.muted .volume-control {
-    opacity: 0.5;
 }

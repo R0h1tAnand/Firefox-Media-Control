@@ -1,5 +1,4 @@
 // Popup script for Global Media Controller
-// Use browser API (Firefox) or chrome API (Chrome) for cross-compatibility
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 class MediaControllerPopup {
@@ -7,32 +6,31 @@ class MediaControllerPopup {
     this.sessions = new Map();
     this.port = null;
     this.allWindowsMode = false;
-    
+    // Optimistic state tracking
+    this.optimisticStates = new Map(); // sessionId -> { paused: boolean, timestamp: number }
+
     this.init();
   }
 
   async init() {
-    // Get DOM elements
     this.sessionsList = document.getElementById('sessionsList');
     this.emptyState = document.getElementById('emptyState');
     this.allWindowsToggle = document.getElementById('allWindowsToggle');
 
-    // Set up event listeners
-    this.allWindowsToggle.addEventListener('change', (e) => {
-      this.allWindowsMode = e.target.checked;
-      this.updateDisplay();
-    });
+    if (this.allWindowsToggle) {
+      this.allWindowsToggle.addEventListener('change', (e) => {
+        this.allWindowsMode = e.target.checked;
+        this.updateDisplay();
+      });
+    }
 
-    // Connect to background script
     this.connectToBackground();
-
-    // Load initial state
     await this.loadSessions();
   }
 
   connectToBackground() {
     this.port = browserAPI.runtime.connect({ name: 'popup' });
-    
+
     this.port.onMessage.addListener((message) => {
       this.handleBackgroundMessage(message);
     });
@@ -47,8 +45,8 @@ class MediaControllerPopup {
       const response = await browserAPI.runtime.sendMessage({
         type: 'GET_SESSIONS'
       });
-      
-      if (response.sessions) {
+
+      if (response && response.sessions) {
         this.sessions.clear();
         for (const session of response.sessions) {
           this.sessions.set(session.id, session);
@@ -71,6 +69,17 @@ class MediaControllerPopup {
         break;
 
       case 'SESSION_UPDATED':
+        // If we have a recent optimistic update (within 500ms), ignore the background state for paused
+        // to prevent flickering if the background is slightly delayed
+        const optState = this.optimisticStates.get(message.session.id);
+        if (optState && (Date.now() - optState.timestamp < 1000)) {
+          // Keep our optimistic pause state, but update everything else (time, volume, etc)
+          message.session.state.paused = optState.paused;
+        } else {
+          // Clear old optimistic state
+          this.optimisticStates.delete(message.session.id);
+        }
+
         this.sessions.set(message.session.id, message.session);
         this.updateSessionCard(message.session);
         this.updateDisplay();
@@ -78,6 +87,7 @@ class MediaControllerPopup {
 
       case 'SESSION_REMOVED':
         this.sessions.delete(message.sessionId);
+        this.optimisticStates.delete(message.sessionId);
         this.removeSessionCard(message.sessionId);
         this.updateDisplay();
         break;
@@ -85,457 +95,399 @@ class MediaControllerPopup {
   }
 
   updateDisplay() {
-    const sessionsToShow = this.getFilteredSessions();
-    
+    const sessionsToShow = Array.from(this.sessions.values());
+
     if (sessionsToShow.length === 0) {
-      this.sessionsList.classList.add('hidden');
-      this.emptyState.classList.remove('hidden');
+      if (this.sessionsList) this.sessionsList.classList.add('hidden');
+      if (this.emptyState) this.emptyState.classList.remove('hidden');
     } else {
-      this.sessionsList.classList.remove('hidden');
-      this.emptyState.classList.add('hidden');
-      
-      // Update existing cards and add new ones
+      if (this.sessionsList) this.sessionsList.classList.remove('hidden');
+      if (this.emptyState) this.emptyState.classList.add('hidden');
       this.renderSessions(sessionsToShow);
     }
   }
 
-  getFilteredSessions() {
-    // For now, show all sessions (all windows mode not fully implemented)
-    return Array.from(this.sessions.values());
+  renderSessions(sessions) {
+    // Basic diffing to avoid full re-render
+    // For now, if count matches, we blindly update. If not, re-render all.
+    // Optimization: Just check if IDs exist.
+    const container = this.sessionsList;
+    const existingIds = new Set(Array.from(container.children).map(c => c.dataset.sessionId));
+    const newIds = new Set(sessions.map(s => s.id));
+
+    // Remove old
+    for (const child of Array.from(container.children)) {
+      if (!newIds.has(child.dataset.sessionId)) {
+        child.remove();
+      }
+    }
+
+    // Sort: playing sessions first, then by lastActiveAt
+    sessions.sort((a, b) => {
+      const aPlaying = a.state && !a.state.paused ? 1 : 0;
+      const bPlaying = b.state && !b.state.paused ? 1 : 0;
+      if (bPlaying !== aPlaying) return bPlaying - aPlaying;
+      return b.lastActiveAt - a.lastActiveAt;
+    });
+
+    // Add/Moved
+    for (const session of sessions) {
+      let card = container.querySelector(`[data-session-id="${session.id}"]`);
+      if (!card) {
+        card = this.createSessionCard(session);
+        container.appendChild(card);
+      } else {
+        // Re-order if needed (appendChild moves it to end)
+        // But complex re-ordering might be overkill, let's just append to maintain sort order
+        container.appendChild(card);
+        // Update content is handled by updateSessionCard called separately or here?
+        // We should ensure content is fresh.
+        // updateSessionCard is called by SESSION_UPDATED.
+        // But initial render needs data.
+        this.updateSessionCardDOM(card, session);
+      }
+    }
   }
 
-  renderSessions(sessions) {
-    // Clear existing cards
-    this.sessionsList.innerHTML = '';
-    
-    // Sort sessions by last active time
-    sessions.sort((a, b) => b.lastActiveAt - a.lastActiveAt);
-    
-    for (const session of sessions) {
-      const card = this.createSessionCard(session);
-      this.sessionsList.appendChild(card);
+  // Parse title into { title, artist } trying to be smart about " - " separators
+  parseMetadata(title) {
+    if (!title) return { title: 'Unknown Title', artist: 'Unknown Artist' };
+
+    const separator = ' - ';
+    const parts = title.split(separator);
+    if (parts.length >= 2) {
+      // Heuristic: Artist is usually first for some sites, Title first for others.
+      // Spotify standard: "Title - Artist" usually in window title, but MediaSession API is better.
+      // The extension sends `document.title` or a constructed string.
+      // Let's assume the constructed string in mediaAgent is `${trackName} - ${artistName}`
+      return { title: parts[0], artist: parts.slice(1).join(separator) };
     }
+    return { title: title, artist: '' }; // No artist detected
   }
 
   createSessionCard(session) {
     const card = document.createElement('div');
     card.className = 'session-card';
     card.dataset.sessionId = session.id;
-    
-    if (session.state.paused) {
-      card.classList.add('paused');
-    }
-    
-    if (session.state.muted) {
-      card.classList.add('muted');
-    }
 
-    // Get site name from URL
-    const siteName = this.getSiteName(session.url);
-    
+    // Initial structure
     card.innerHTML = `
       <div class="session-header">
         <div class="session-artwork">
-          ${session.artworkUrl ? 
-            `<img src="${session.artworkUrl}" alt="Artwork">` : 
-            `<div class="session-artwork-fallback">${session.favIconUrl ? 
-              `<img src="${session.favIconUrl}" alt="Site icon">` : 
-              '🎵'
-            }</div>`
-          }
+            <img src="" alt="Album Art" loading="lazy">
         </div>
         <div class="session-info">
-          <div class="session-title" title="${session.title}">${session.title}</div>
-          <div class="session-site" title="${siteName}">${siteName}</div>
+            <div class="session-site-row">
+                <img class="session-site-icon" src="" alt="">
+                <span class="session-site"></span>
+            </div>
+            <div class="session-title"></div>
+            <div class="session-artist"></div>
         </div>
       </div>
       
+      <div class="progress-info">
+          <div class="progress-container">
+            <div class="time-display current-time">0:00</div>
+            <div class="progress-bar" data-action="seek-to">
+              <div class="progress-fill"></div>
+              <div class="progress-handle"></div>
+            </div>
+            <div class="time-display duration">0:00</div>
+          </div>
+      </div>
+
       <div class="session-controls">
-        <button class="control-btn" data-action="previousTrack" title="Previous Track" aria-label="Previous Track">
-          <!-- Backward step icon -->
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-            <rect x="2" y="4" width="3" height="16" rx="1" />
-            <path d="M9 12L20 19V5L9 12Z" />
-          </svg>
-        </button>
-        <button class="control-btn seek-btn" data-action="seek-backward" title="Seek -10s" aria-label="Rewind 10 seconds">
-          <!-- MdOutlineReplay10-like icon (back 10) -->
-          <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="currentColor">
-            <path d="M11.99 5V1l-5 5 5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h-2c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
-            <text x="12" y="15" font-size="7" font-weight="bold" fill="currentColor" text-anchor="middle">10</text>
-          </svg>
-        </button>
-        <button class="control-btn primary" data-action="toggle" title="${session.state.paused ? 'Play' : 'Pause'}" aria-label="Play or Pause">
-          ${session.state.paused ? `
-            <!-- Play icon (FaPlay-like) -->
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
-              <path d="M6 4v16l12-8L6 4z" />
-            </svg>
-          ` : `
-            <!-- Pause icon (FaPause-like) -->
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
-              <rect x="6" y="5" width="4" height="14" rx="1" />
-              <rect x="14" y="5" width="4" height="14" rx="1" />
-            </svg>
-          `}
-        </button>
-        <button class="control-btn seek-btn" data-action="seek-forward" title="Seek +10s" aria-label="Forward 10 seconds">
-          <!-- MdForward10-like icon (forward 10) -->
-          <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="currentColor">
-            <path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/>
-            <text x="12" y="15" font-size="7" font-weight="bold" fill="currentColor" text-anchor="middle">10</text>
-          </svg>
-        </button>
-        <button class="control-btn" data-action="nextTrack" title="Next Track" aria-label="Next Track">
-          <!-- Forward step icon -->
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-            <path d="M4 5v14l11-7L4 5z" />
-            <rect x="18" y="4" width="3" height="16" rx="1" />
-          </svg>
-        </button>
+         <button class="control-btn" data-action="previousTrack" title="Previous">
+             <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+         </button>
+         <button class="control-btn" data-action="seek-backward" title="-10s">
+             <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12.5 3C8.36 3 4.86 5.48 3.23 9H1l3.5 4 3.5-4H5.67C7.01 6.57 9.56 5 12.5 5c4.14 0 7.5 3.36 7.5 7.5S16.64 20 12.5 20c-3.27 0-6.05-2.1-7.07-5H3.29c1.12 4.22 5.02 7.5 9.71 7.5 5.52 0 10-4.48 10-10S18.02 3 12.5 3z"/><text x="12.5" y="14" font-size="6" font-weight="bold" fill="currentColor" text-anchor="middle">10</text></svg>
+         </button>
+         <button class="control-btn primary toggle-play-btn" data-action="toggle" title="Play/Pause">
+             <!-- Icon injected dynamically -->
+         </button>
+         <button class="control-btn" data-action="seek-forward" title="+10s">
+             <svg viewBox="0 0 24 24" width="18" height="18"><path d="M11.5 3c4.14 0 7.64 2.48 9.27 6H23l-3.5 4-3.5-4h2.33C16.99 6.57 14.44 5 11.5 5 7.36 5 4 8.36 4 12.5S7.36 20 11.5 20c3.27 0 6.05-2.1 7.07-5h2.14c-1.12 4.22-5.02 7.5-9.71 7.5-5.52 0-10-4.48-10-10S5.98 3 11.5 3z"/><text x="11.5" y="14" font-size="6" font-weight="bold" fill="currentColor" text-anchor="middle">10</text></svg>
+         </button>
+         <button class="control-btn" data-action="nextTrack" title="Next">
+             <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+         </button>
       </div>
-      
-      <div class="progress-container">
-        <span class="time-display">${this.formatTime(session.state.currentTime)}</span>
-        <div class="progress-bar" data-action="seek-to">
-          <div class="progress-fill"></div>
-          <div class="progress-handle"></div>
-        </div>
-        <span class="time-display">${this.formatTime(session.state.duration)}</span>
-      </div>
-      
+
       <div class="session-footer">
-        <div class="volume-control">
-          <button class="control-btn" data-action="mute" title="${session.state.muted ? 'Unmute' : 'Mute'}">
-            ${session.state.muted ? '🔇' : '🔊'}
+          <div class="volume-control">
+             <span class="volume-icon" data-action="mute">🔊</span>
+             <input type="range" class="volume-slider" min="0" max="1" step="0.01">
+          </div>
+          <button class="control-btn open-tab-btn" data-action="open-tab" title="Open Tab">
+             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
           </button>
-          <input type="range" class="volume-slider" min="0" max="1" step="0.01" 
-                 value="${session.state.volume}" data-action="volume">
-        </div>
-        <button class="control-btn open-tab-btn" data-action="open-tab" title="Open tab">
-          🔗
-        </button>
       </div>
     `;
 
-    // Add event listeners
     this.addCardEventListeners(card, session);
-    
-    // Update progress bar
-    this.updateProgressBar(card, session.state);
-    
+    this.updateSessionCardDOM(card, session);
+    // Init progress bar logic
+    this.addProgressBarDragSupport(card.querySelector('.progress-bar'), session);
+
     return card;
   }
 
-  addCardEventListeners(card, session) {
-    // Control buttons
-    card.addEventListener('click', (e) => {
-      const action = e.target.dataset.action;
-      if (!action) return;
-      
-      e.preventDefault();
-      e.stopPropagation();
-      
-      this.handleAction(session.id, action, e);
-    });
+  updateSessionCard(session) {
+    const card = this.sessionsList.querySelector(`[data-session-id="${session.id}"]`);
+    if (card) {
+      this.updateSessionCardDOM(card, session);
+    }
+  }
 
-    // Progress bar seeking
+  updateSessionCardDOM(card, session) {
+    // Logic to update DOM elements efficiently
+    const { title, artist } = this.parseMetadata(session.title);
+
+    const titleEl = card.querySelector('.session-title');
+    if (titleEl.textContent !== title) titleEl.textContent = title;
+
+    const artistEl = card.querySelector('.session-artist');
+    if (artistEl.textContent !== artist) artistEl.textContent = artist;
+
+    const siteEl = card.querySelector('.session-site');
+    const siteName = this.getSiteName(session.url);
+    if (siteEl.textContent !== siteName) siteEl.textContent = siteName;
+
+    // Icon
+    const iconEl = card.querySelector('.session-site-icon');
+    if (session.favIconUrl) iconEl.src = session.favIconUrl;
+    else iconEl.style.display = 'none';
+
+    // Artwork
+    const artImg = card.querySelector('.session-artwork img');
+    const artContainer = card.querySelector('.session-artwork');
+    if (session.artworkUrl) {
+      if (artImg.src !== session.artworkUrl) artImg.src = session.artworkUrl;
+      artImg.style.display = 'block';
+      // Use SVG fallback if error?
+    } else {
+      // Fallback if no artwork
+      if (session.favIconUrl) {
+        if (artImg.src !== session.favIconUrl) artImg.src = session.favIconUrl;
+        artImg.style.display = 'block';
+      } else {
+        artImg.style.display = 'none';
+        // Maybe insert a generic icon
+      }
+    }
+
+    // Play/Pause Button
+    const playBtn = card.querySelector('.toggle-play-btn');
+    const isPaused = session.state.paused;
+    const playIcon = `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M8 5v14l11-7z"/></svg>`;
+    const pauseIcon = `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+
+    // Only update HTML if it changed to prevent flicker
+    const targetIcon = isPaused ? playIcon : pauseIcon;
+    if (playBtn.innerHTML !== targetIcon) playBtn.innerHTML = targetIcon;
+    playBtn.title = isPaused ? 'Play' : 'Pause';
+
+    // Volume
+    const volSlide = card.querySelector('.volume-slider');
+    // Only update slider if user is NOT dragging it (check active element)
+    if (document.activeElement !== volSlide) {
+      volSlide.value = session.state.volume;
+      // Visual fill for slider (webkit hack usually needed, but here we just set value)
+    }
+
+    const muteIcon = card.querySelector('.volume-icon');
+    muteIcon.textContent = session.state.muted ? '🔇' : '🔊';
+
+    // Progress (only if not dragging)
     const progressBar = card.querySelector('.progress-bar');
-    progressBar.addEventListener('click', (e) => {
-      this.handleProgressBarClick(session.id, session.state, e);
+    if (!progressBar.classList.contains('dragging')) {
+      this.updateProgressBarVisuals(card, session.state);
+    }
+  }
+
+  updateProgressBarVisuals(card, state) {
+    const progressFill = card.querySelector('.progress-fill');
+    const progressHandle = card.querySelector('.progress-handle');
+    const currentEl = card.querySelector('.current-time');
+    const durationEl = card.querySelector('.duration');
+
+    if (!state.duration) {
+      progressFill.style.width = '0%';
+      progressHandle.style.left = '0%';
+      return;
+    }
+
+    const pct = (state.currentTime / state.duration) * 100;
+    progressFill.style.width = `${pct}%`;
+    progressHandle.style.left = `${pct}%`;
+
+    currentEl.textContent = this.formatTime(state.currentTime);
+    durationEl.textContent = this.formatTime(state.duration);
+  }
+
+  addCardEventListeners(card, session) {
+    // Delegated clicks for controls
+    card.addEventListener('click', (e) => {
+      const btn = e.target.closest('.control-btn, .volume-icon');
+      if (!btn) return;
+
+      const action = btn.dataset.action;
+      if (!action) return;
+
+      e.stopPropagation();
+
+      if (action === 'toggle') {
+        this.handleToggle(session, btn);
+      } else if (action === 'mute') {
+        this.sendControlCommand(session.id, 'mute');
+      } else if (action === 'open-tab') {
+        this.openTab(session.id);
+      } else if (action === 'seek-forward') {
+        this.sendControlCommand(session.id, 'seek', { delta: 10 });
+      } else if (action === 'seek-backward') {
+        this.sendControlCommand(session.id, 'seek', { delta: -10 });
+      } else if (action === 'nextTrack') {
+        this.sendControlCommand(session.id, 'nextTrack');
+      } else if (action === 'previousTrack') {
+        this.sendControlCommand(session.id, 'previousTrack');
+      }
     });
 
-    // Add drag support for progress bar
-    this.addProgressBarDragSupport(progressBar, session);
-
-    // Volume slider
     const volumeSlider = card.querySelector('.volume-slider');
     volumeSlider.addEventListener('input', (e) => {
-      this.sendControlCommand(session.id, 'setVolume', { volume: parseFloat(e.target.value) });
+      const vol = parseFloat(e.target.value);
+      this.sendControlCommand(session.id, 'setVolume', { volume: vol });
     });
   }
 
-  handleAction(sessionId, action, event) {
-    switch (action) {
-      case 'toggle':
-        this.sendControlCommand(sessionId, 'toggle');
-        break;
-        
-      case 'seek-backward':
-        this.sendControlCommand(sessionId, 'seek', { delta: -10 });
-        break;
-        
-      case 'seek-forward':
-        this.sendControlCommand(sessionId, 'seek', { delta: 10 });
-        break;
+  handleToggle(session, btn) {
+    // OPTIMISTIC UPDATE
+    const newPausedState = !session.state.paused;
+    session.state.paused = newPausedState;
 
-      case 'previousTrack':
-        this.sendControlCommand(sessionId, 'previousTrack');
-        break;
+    // Update our Optimistic map to ignore incoming stale messages for a bit
+    this.optimisticStates.set(session.id, {
+      paused: newPausedState,
+      timestamp: Date.now()
+    });
 
-      case 'nextTrack':
-        this.sendControlCommand(sessionId, 'nextTrack');
-        break;
-        
-      case 'mute':
-        this.sendControlCommand(sessionId, 'mute');
-        break;
-        
-      case 'open-tab':
-        this.openTab(sessionId);
-        break;
-    }
+    // Force UI update immediately
+    this.updateSessionCardDOM(btn.closest('.session-card'), session);
+
+    // Send actual command
+    this.sendControlCommand(session.id, 'toggle');
   }
 
   addProgressBarDragSupport(progressBar, session) {
     let isDragging = false;
-    let wasPlaying = false;
-    
-    const startDrag = (e) => {
-      if (!session.state.canSeek || !session.state.duration) return;
-      
-      isDragging = true;
-      wasPlaying = !session.state.paused;
-      
-      // Add visual feedback
-      progressBar.classList.add('dragging');
-      
-  // Notify content script that seek is beginning to suppress updates
-  this.sendControlCommand(session.id, 'beginSeek');
-      
-      document.addEventListener('mousemove', onDrag);
-      document.addEventListener('mouseup', endDrag);
-      
-      // Handle initial position
-      onDrag(e);
-      e.preventDefault();
-    };
-    
-    const onDrag = (e) => {
-      if (!isDragging) return;
-      
-      const rect = progressBar.getBoundingClientRect();
-      const clickX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-      const percentage = clickX / rect.width;
-      const newTime = percentage * session.state.duration;
-      
-      // Update UI immediately for responsive feedback
-      const progressFill = progressBar.querySelector('.progress-fill');
-      const progressHandle = progressBar.querySelector('.progress-handle');
-      
-      if (progressFill) {
-        progressFill.style.width = `${percentage * 100}%`;
-      }
-      if (progressHandle) {
-        progressHandle.style.left = `${percentage * 100}%`;
-      }
-      
-      // Update time display
-      const card = progressBar.closest('.session-card');
-      const timeDisplays = card.querySelectorAll('.time-display');
-      if (timeDisplays.length >= 1) {
-        timeDisplays[0].textContent = this.formatTime(newTime);
-      }
-      
-      e.preventDefault();
-    };
-    
-    const endDrag = (e) => {
-      if (!isDragging) return;
-      
-      isDragging = false;
-      progressBar.classList.remove('dragging');
-      
-      document.removeEventListener('mousemove', onDrag);
-      document.removeEventListener('mouseup', endDrag);
-      
-      // Calculate final position and seek
-      const rect = progressBar.getBoundingClientRect();
-      const clickX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-      const percentage = clickX / rect.width;
-      const newTime = percentage * session.state.duration;
-      
-  // Send seek command and notify end of seek so content script can resume updates
-  this.sendControlCommand(session.id, 'setTime', { time: newTime });
-  this.sendControlCommand(session.id, 'endSeek');
-      
-      e.preventDefault();
-    };
-    
-    // Mouse events
-    progressBar.addEventListener('mousedown', startDrag);
-    
-    // Touch events for mobile support
-    progressBar.addEventListener('touchstart', (e) => {
-      const touch = e.touches[0];
-      startDrag({
-        clientX: touch.clientX,
-        clientY: touch.clientY,
-        preventDefault: () => e.preventDefault()
-      });
-    });
-    
-    progressBar.addEventListener('touchmove', (e) => {
-      if (isDragging) {
-        const touch = e.touches[0];
-        onDrag({
-          clientX: touch.clientX,
-          clientY: touch.clientY,
-          preventDefault: () => e.preventDefault()
-        });
-      }
-    });
-    
-    progressBar.addEventListener('touchend', (e) => {
-      if (isDragging) {
-        const touch = e.changedTouches[0];
-        endDrag({
-          clientX: touch.clientX,
-          clientY: touch.clientY,
-          preventDefault: () => e.preventDefault()
-        });
-      }
-    });
-  }
 
-  handleProgressBarClick(sessionId, state, event) {
-    if (!state.canSeek || !state.duration) return;
-    
-    const progressBar = event.currentTarget;
-    const rect = progressBar.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-    const percentage = clickX / rect.width;
-    const newTime = percentage * state.duration;
-    
-    this.sendControlCommand(sessionId, 'setTime', { time: newTime });
+    // Mouse events
+    const startDrag = (e) => {
+      if (!session.state.duration) return;
+      isDragging = true;
+      progressBar.classList.add('dragging');
+      this.sendControlCommand(session.id, 'beginSeek'); // Pause updates
+
+      const onMove = (moveEvent) => {
+        const rect = progressBar.getBoundingClientRect();
+        const clientX = moveEvent.clientX || (moveEvent.touches && moveEvent.touches[0].clientX);
+        const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+        const pct = x / rect.width;
+
+        // Update visuals locally
+        const card = progressBar.closest('.session-card');
+        const progressFill = card.querySelector('.progress-fill');
+        const progressHandle = card.querySelector('.progress-handle');
+        const timeDisplay = card.querySelector('.current-time');
+
+        progressFill.style.width = `${pct * 100}%`;
+        progressHandle.style.left = `${pct * 100}%`;
+
+        const time = pct * session.state.duration;
+        timeDisplay.textContent = this.formatTime(time);
+      };
+
+      const onEnd = (endEvent) => {
+        isDragging = false;
+        progressBar.classList.remove('dragging');
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onEnd);
+        document.removeEventListener('touchmove', onMove);
+        document.removeEventListener('touchend', onEnd);
+
+        // Calculate final time and send
+        const rect = progressBar.getBoundingClientRect();
+        // use last known position if needed, but for mouseup we can use clientX usually
+        // For simple logic, let's just use the visual % we left it at? 
+        // Better to recalc from event if possible, but let's stick to the visual fill width as truth
+        const card = progressBar.closest('.session-card');
+        const fill = card.querySelector('.progress-fill');
+        const pct = parseFloat(fill.style.width) / 100;
+        const finalTime = pct * session.state.duration;
+
+        this.sendControlCommand(session.id, 'setTime', { time: finalTime });
+        this.sendControlCommand(session.id, 'endSeek');
+      };
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onEnd);
+      document.addEventListener('touchmove', onMove);
+      document.addEventListener('touchend', onEnd);
+
+      onMove(e); // Init
+    };
+
+    progressBar.addEventListener('mousedown', startDrag);
+    progressBar.addEventListener('touchstart', startDrag);
   }
 
   sendControlCommand(sessionId, cmd, params = {}) {
     if (this.port) {
       this.port.postMessage({
         type: 'CONTROL_COMMAND',
-        data: {
-          sessionId,
-          cmd,
-          ...params
-        }
+        data: { sessionId, cmd, ...params }
       });
     }
   }
 
   async openTab(sessionId) {
     const session = this.sessions.get(sessionId);
-    if (!session) return;
-    
-    try {
-      // Focus the tab
-      await browserAPI.tabs.update(session.tabId, { active: true });
-      
-      // Focus the window containing the tab
-      const tab = await browserAPI.tabs.get(session.tabId);
-      await browserAPI.windows.update(tab.windowId, { focused: true });
-      
-      // Close popup
-      window.close();
-    } catch (error) {
-      console.error('Error opening tab:', error);
-    }
-  }
+    if (session) {
+      try {
+        // Focus the tab
+        await browserAPI.tabs.update(session.tabId, { active: true });
 
-  updateSessionCard(session) {
-    const card = document.querySelector(`[data-session-id="${session.id}"]`);
-    if (!card) return;
-    
-    // Update pause state
-    card.classList.toggle('paused', session.state.paused);
-    card.classList.toggle('muted', session.state.muted);
-    
-    // Update play/pause button
-    const toggleBtn = card.querySelector('[data-action="toggle"]');
-    if (toggleBtn) {
-      // Replace contents with inline SVGs to match FaPlay / FaPause visuals
-      toggleBtn.innerHTML = session.state.paused ?
-        `<!-- Play icon -->
-         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
-           <path d="M6 4v16l12-8L6 4z" />
-         </svg>` :
-        `<!-- Pause icon -->
-         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
-           <rect x="6" y="5" width="4" height="14" rx="1" />
-           <rect x="14" y="5" width="4" height="14" rx="1" />
-         </svg>`;
-      toggleBtn.title = session.state.paused ? 'Play' : 'Pause';
-    }
-    
-    // Update mute button
-    const muteBtn = card.querySelector('[data-action="mute"]');
-    if (muteBtn) {
-      muteBtn.innerHTML = session.state.muted ? '🔇' : '🔊';
-      muteBtn.title = session.state.muted ? 'Unmute' : 'Mute';
-    }
-    
-    // Update volume slider
-    const volumeSlider = card.querySelector('.volume-slider');
-    if (volumeSlider) {
-      volumeSlider.value = session.state.volume;
-    }
-    
-    // Update progress bar
-    this.updateProgressBar(card, session.state);
-    
-    // Update time displays
-    const timeDisplays = card.querySelectorAll('.time-display');
-    if (timeDisplays.length >= 2) {
-      timeDisplays[0].textContent = this.formatTime(session.state.currentTime);
-      timeDisplays[1].textContent = this.formatTime(session.state.duration);
-    }
-  }
-
-  updateProgressBar(card, state) {
-    const progressFill = card.querySelector('.progress-fill');
-    const progressHandle = card.querySelector('.progress-handle');
-    
-    if (!progressFill || !progressHandle || !state.duration) return;
-    
-    // Don't update progress bar if user is currently dragging it
-    const progressBar = card.querySelector('.progress-bar');
-    if (progressBar && progressBar.classList.contains('dragging')) {
-      return;
-    }
-    
-    const percentage = (state.currentTime / state.duration) * 100;
-    progressFill.style.width = `${percentage}%`;
-    progressHandle.style.left = `${percentage}%`;
-  }
-
-  removeSessionCard(sessionId) {
-    const card = document.querySelector(`[data-session-id="${sessionId}"]`);
-    if (card) {
-      card.remove();
+        // Focus the window containing the tab
+        const tab = await browserAPI.tabs.get(session.tabId);
+        if (tab && tab.windowId) {
+          await browserAPI.windows.update(tab.windowId, { focused: true });
+        }
+        window.close();
+      } catch (e) {
+        console.error('Error opening tab:', e);
+      }
     }
   }
 
   getSiteName(url) {
     try {
       const urlObj = new URL(url);
-      return urlObj.hostname.replace('www.', '');
+      return urlObj.hostname.replace(/^www\./, '');
     } catch {
       return 'Unknown site';
     }
   }
 
   formatTime(seconds) {
-    if (!seconds || !isFinite(seconds)) return '0:00';
-    
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    if (!seconds || isNaN(seconds)) return '0:00';
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
   }
 }
 
-// Initialize popup when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   new MediaControllerPopup();
 });
-
-console.log('Media Controller popup script loaded');
