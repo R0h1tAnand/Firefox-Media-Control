@@ -3,6 +3,7 @@
   "name": "Global Media Controller",
   "version": "0.1.0",
   "description": "Control media playback across all tabs from a single toolbar popup",
+  "homepage_url": "https://github.com/R0h1tAnand/Firefox-Media-Control",
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
