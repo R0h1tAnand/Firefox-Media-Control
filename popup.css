@@ -351,9 +351,13 @@ input:checked+.slider:before {
     /* Smooth linear update for progress */
 }
 
-.session-card:hover .progress-fill {
+/* Progress fill turns accent when media is actively playing.
+ * Keyed off a JS-toggled .playing class instead of :hover so that
+ * frequent JS width mutations don't trigger a mid-transition style
+ * recalc that conflicts with the card's hover background transition
+ * (the root cause of the hover-flicker bug). */
+.session-card.playing .progress-fill {
     background: var(--accent);
-    /* Turn green on hover like Spotify */
 }
 
 .progress-handle {

@@ -281,6 +281,11 @@ class MediaControllerPopup {
     // Play/Pause Button
     const playBtn = card.querySelector('.toggle-play-btn');
     const isPaused = session.state.paused;
+
+    // Toggle .playing class — drives the accent-color on the progress fill
+    // via CSS (.session-card.playing .progress-fill) instead of :hover,
+    // which was causing the hover-flicker when JS mutated style.width mid-transition.
+    card.classList.toggle('playing', !isPaused);
     const playIcon = `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M8 5v14l11-7z"/></svg>`;
     const pauseIcon = `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
 
