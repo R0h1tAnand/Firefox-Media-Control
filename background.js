@@ -4,11 +4,22 @@
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 class MediaSessionManager {
+  // Sites that produce audio (voice/conferencing) but should NOT be treated as media sessions.
+  // Note: discord.com is intentionally omitted here — it is filtered at the content-script
+  // level instead, so that real video/screen-share sessions can still be detected in future.
+  static DENIED_SITES = [
+    'slack.com',
+    'teams.microsoft.com',
+    'teams.live.com',
+    'meet.google.com',
+    'zoom.us'
+  ];
+
   constructor() {
     this.sessions = new Map(); // sessionId -> session data
     this.ports = new Set(); // connected popup ports
     this.lastActiveSessionId = null;
-  this.lastBroadcastTimestamps = new Map(); // sessionId -> timestamp
+    this.lastBroadcastTimestamps = new Map(); // sessionId -> timestamp
     
     this.init();
   }
@@ -28,8 +39,9 @@ class MediaSessionManager {
                            tab.url.includes('youtube.com') ||
                            tab.url.includes('soundcloud.com') ||
                            tab.url.includes('music.youtube.com');
+        const isDenied = MediaSessionManager.DENIED_SITES.some(d => tab.url.includes(d));
         
-        if (isMusicSite) {
+        if (isMusicSite && !isDenied) {
           console.log('Music site loaded, injecting agent:', tab.url);
           setTimeout(() => this.injectMediaAgent(tabId), 1000);
         }
@@ -89,12 +101,15 @@ class MediaSessionManager {
       const allTabs = await browserAPI.tabs.query({});
       
       for (const tab of allTabs) {
-        if (tab.url && (
+        if (!tab.url) continue;
+        const isDenied = MediaSessionManager.DENIED_SITES.some(d => tab.url.includes(d));
+        if (isDenied) continue;
+        if (
           tab.url.includes('spotify.com') ||
           tab.url.includes('youtube.com') ||
           tab.url.includes('soundcloud.com') ||
           tab.url.includes('music.youtube.com')
-        )) {
+        ) {
           console.log('Found music site tab:', tab.url);
           await this.injectMediaAgent(tab.id);
         }
@@ -108,6 +123,11 @@ class MediaSessionManager {
     console.log('Tab audible change detected:', tab.id, 'audible:', tab.audible, 'url:', tab.url);
     
     if (tab.audible) {
+      // Skip voice-chat / conferencing sites that produce audio but not media content
+      if (tab.url && MediaSessionManager.DENIED_SITES.some(d => tab.url.includes(d))) {
+        console.log('Skipping denied site (voice/conferencing):', tab.url);
+        return;
+      }
       // Tab became audible, inject media agent if needed
       console.log('Injecting media agent into audible tab:', tab.id);
       await this.injectMediaAgent(tab.id);
