@@ -57,14 +57,33 @@
       console.log('MediaAgent: Searching for media elements...');
       
       // First try standard media elements
-      let mediaElements = document.querySelectorAll('video, audio');
+      let mediaElements = Array.from(document.querySelectorAll('video, audio'));
       console.log('MediaAgent: Found', mediaElements.length, 'standard media elements');
       
-      // Special handling for Spotify and other web players
+      // Special handling for Spotify (no real <audio> element in DOM)
       if (mediaElements.length === 0 && this.isSpotify()) {
         console.log('MediaAgent: Spotify detected, using virtual media element');
         this.createSpotifyVirtualElement();
         return;
+      }
+
+      // For SoundCloud: make sure we surface the right audio element
+      // SoundCloud uses a persistent <audio> but may have disableRemotePlayback=true;
+      // our scorer now only penalises it instead of hard-rejecting, so normal
+      // scoring will pick it up.  If the list is empty, try a targeted selector.
+      if (mediaElements.length === 0 && this.isSoundCloud()) {
+        console.log('MediaAgent: SoundCloud detected, trying targeted audio selector');
+        const scAudio = document.querySelector('audio') ||
+                        document.querySelector('[class*="soundcloud"] audio') ||
+                        document.querySelector('[class*="playback"] audio');
+        if (scAudio) {
+          mediaElements = [scAudio];
+        } else {
+          // Fall back to MediaSession polling for SoundCloud
+          console.log('MediaAgent: SoundCloud - no <audio> found, using MediaSession polling');
+          this.createMediaSessionVirtualElement();
+          return;
+        }
       }
       
       let bestElement = null;
@@ -80,6 +99,21 @@
       }
 
       if (bestElement && bestScore >= 0) {
+        // Extra guard: skip elements with no real content (e.g. WebRTC voice/MediaStream elements).
+        // A MediaStream srcObject with no src is a live voice/RTC stream — we can't seek/control it
+        // and it doesn't represent user media content (e.g. Discord voice chat).
+        const isLiveMediaStream = bestElement.srcObject instanceof MediaStream &&
+                                  !bestElement.src && !bestElement.currentSrc;
+        const hasSrc = !!(bestElement.src || bestElement.currentSrc || bestElement.children.length > 0);
+        const hasContent = hasSrc || (bestElement.duration > 0 && isFinite(bestElement.duration)) || !bestElement.paused;
+        if (!hasContent || isLiveMediaStream) {
+          console.log('MediaAgent: Best element has no playable content or is a live stream, skipping (voice/WebRTC?)');
+          if (this.retryCount < 5) {
+            this.retryCount++;
+            setTimeout(() => this.findAndAttachMedia(), 2000);
+          }
+          return;
+        }
         console.log('MediaAgent: Attaching to best element:', bestElement, 'score:', bestScore);
         this.attachToElement(bestElement);
       } else if (this.retryCount < 5) {
@@ -92,6 +126,123 @@
     isSpotify() {
       return window.location.hostname.includes('spotify.com');
     }
+
+    isSoundCloud() {
+      return window.location.hostname.includes('soundcloud.com');
+    }
+
+    // Creates a lightweight virtual element driven by the MediaSession API.
+    // Used for SoundCloud (and potentially other sites) when no real <audio>
+    // is accessible from the page's DOM.
+    createMediaSessionVirtualElement() {
+      console.log('MediaAgent: Creating MediaSession virtual element');
+
+      const virtualElement = {
+        tagName: 'MEDIASESSION_VIRTUAL',
+        paused: true,
+        muted: false,
+        volume: 1,
+        currentTime: 0,
+        duration: 0,
+        seekable: { length: 0 },
+        readyState: 4,
+        isVirtual: true,
+        _currentTime: 0,
+        _volume: 1,
+        _muted: false,
+
+        play: () => {
+          // Try to dispatch a play action via MediaSession
+          try {
+            if (navigator.mediaSession && navigator.mediaSession.playbackState !== 'playing') {
+              // Trigger the site's own play handler
+              const playBtn = document.querySelector(
+                '[aria-label*="Play"], [aria-label*="play"], [data-testid*="play"]'
+              );
+              if (playBtn) { playBtn.click(); }
+            }
+          } catch (e) { console.warn('MediaAgent: MediaSession play failed', e); }
+          return Promise.resolve();
+        },
+
+        pause: () => {
+          try {
+            const pauseBtn = document.querySelector(
+              '[aria-label*="Pause"], [aria-label*="pause"], [data-testid*="pause"]'
+            );
+            if (pauseBtn) { pauseBtn.click(); }
+          } catch (e) { console.warn('MediaAgent: MediaSession pause failed', e); }
+        }
+      };
+
+      this.isVirtual = true;
+      this.attachToElement(virtualElement);
+      this.startMediaSessionMonitoring();
+    }
+
+    // Poll navigator.mediaSession for state updates (SoundCloud / generic)
+    startMediaSessionMonitoring() {
+      console.log('MediaAgent: Starting MediaSession monitoring');
+      setInterval(() => {
+        this.checkMediaSessionState();
+      }, 1000);
+    }
+
+    checkMediaSessionState() {
+      if (!this.mediaElement || !this.mediaElement.isVirtual) return;
+
+      const ms = navigator.mediaSession;
+      if (!ms) return;
+
+      const playing = ms.playbackState === 'playing';
+      const paused  = ms.playbackState === 'paused' || ms.playbackState === 'none';
+
+      let title = 'Unknown Track';
+      let artworkUrl = null;
+      if (ms.metadata) {
+        title = ms.metadata.title
+          ? `${ms.metadata.title}${ms.metadata.artist ? ' - ' + ms.metadata.artist : ''}`
+          : document.title;
+        if (ms.metadata.artwork && ms.metadata.artwork.length > 0) {
+          artworkUrl = ms.metadata.artwork[ms.metadata.artwork.length - 1].src;
+        }
+      } else {
+        title = document.title;
+      }
+
+      // Read position from MediaSession positionState if available
+      let currentTime = 0;
+      let duration = 0;
+      if (ms.positionState) {
+        currentTime = ms.positionState.position || 0;
+        duration    = ms.positionState.duration  || 0;
+      }
+
+      const wasPlaying = !this.mediaElement.paused;
+      this.mediaElement.paused      = !playing;
+      this.mediaElement._currentTime = currentTime;
+      this.mediaElement.duration     = duration;
+
+      // Only broadcast on change or while playing
+      if (wasPlaying !== playing || playing) {
+        const sessionData = {
+          title,
+          artworkUrl,
+          state: {
+            paused: !playing,
+            muted: this.mediaElement._muted,
+            volume: this.mediaElement._volume,
+            currentTime,
+            duration,
+            canSeek: duration > 0,
+            ended: false
+          }
+        };
+        browserAPI.runtime.sendMessage({ type: 'SESSION_UPDATE', data: sessionData })
+          .catch(e => console.error('MediaAgent: MediaSession update error', e));
+      }
+    }
+
 
     createSpotifyVirtualElement() {
       console.log('MediaAgent: Creating Spotify virtual element');
@@ -684,7 +835,9 @@
     scoreMediaElement(element) {
       let score = 0;
 
-      if (element.disableRemotePlayback) return -1;
+      // disableRemotePlayback is set by some players (e.g. SoundCloud) to prevent
+      // casting, but the element is still a valid local media source — penalty only.
+      if (element.disableRemotePlayback) score -= 5;
       if (element.readyState === 0) score -= 10;
       if (!element.paused) score += 100;
       if (element.currentTime > 0) score += 50;
@@ -694,7 +847,7 @@
       if (element.offsetWidth > 0 && element.offsetHeight > 0) score += 20;
       if (element.tagName === 'VIDEO') score += 10;
       if (!element.muted) score += 10;
-      if (element.src || element.children.length > 0) score += 5;
+      if (element.src || element.currentSrc || element.children.length > 0) score += 5;
 
       return score;
     }
