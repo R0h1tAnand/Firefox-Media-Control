@@ -34,3 +34,5 @@ Thumbs.db
 # Misc
 *.suo
 *.user
+
+*.agents
