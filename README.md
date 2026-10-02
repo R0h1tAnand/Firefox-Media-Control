@@ -1,182 +1,67 @@
-# Firefox Global Media Controller
-
 <p align="center">
-  <img src="icons/icon.png" width="200" height="200" alt="Firefox Media Controller">
+  <img src="icons/icon.png" width="120" alt="Global Media Controller">
 </p>
 
-A Firefox extension that provides a unified media control interface for all tabs playing audio or video content. Similar to Chrome/Brave's media hub but designed specifically for Firefox.
+<h1 align="center">Global Media Controller</h1>
+
+<p align="center">
+  A Firefox extension to control media playback across all tabs from a single popup — like Chrome's media hub, but for Firefox.
+</p>
+
+<p align="center">
+  <a href="https://github.com/R0h1tAnand/Firefox-Media-Control/releases"><img src="https://img.shields.io/github/v/release/R0h1tAnand/Firefox-Media-Control?style=flat-square" alt="Latest Release"></a>
+  <img src="https://img.shields.io/badge/Firefox-109%2B-orange?style=flat-square&logo=firefox" alt="Firefox 109+">
+  <img src="https://img.shields.io/badge/Manifest-V3-blue?style=flat-square" alt="Manifest V3">
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License">
+</p>
+
+---
+
 ## Features
 
-- **Centralized Control**: Control all playing media from a single toolbar popup  
-- **Universal Compatibility**: Works with YouTube, Spotify Web, SoundCloud, podcasts, and any HTML5 media  
-- **Rich Controls**: Play/pause, seek ±10s, scrubber bar, volume/mute, and tab navigation  
-- **Keyboard Shortcuts**: Global shortcuts for play/pause and seeking  
-- **Real-time Updates**: Live progress tracking and state synchronization  
-
-
-
-
-
-
-
-## Features
-
-- **Centralized Control**: Control all playing media from a single toolbar popup
-- **Universal Compatibility**: Works with YouTube, Spotify Web, SoundCloud, podcasts, and any HTML5 media
-- **Rich Controls**: Play/pause, seek ±10s, scrubber bar, volume/mute, and tab navigation
-- **Keyboard Shortcuts**: Global shortcuts for play/pause and seeking
-- **Real-time Updates**: Live progress tracking and state synchronization
+- **Unified controls** — play/pause, seek ±10s, scrubber, volume, mute, all in one popup
+- **Multi-tab** — manages sessions across every audible tab simultaneously
+- **Keyboard shortcuts** — `Ctrl+Shift+Space` to toggle, `Ctrl+Shift+,/. ` to seek
+- **Works everywhere** — YouTube, Spotify, SoundCloud, Netflix, and any HTML5 media
+- **No telemetry** — everything runs locally, nothing leaves your browser
 
 ## Installation
 
-### Development Installation
+**Temporary (development)**
 
-1. Clone or download this repository
-2. Open Firefox and go to `about:debugging`
-3. Click "This Firefox" in the sidebar
-4. Click "Load Temporary Add-on"
-5. Navigate to the extension folder and select `manifest.json`
+1. Go to `about:debugging` → This Firefox
+2. Click **Load Temporary Add-on**
+3. Select `manifest.json` from this repo
 
-### From Firefox Add-ons (Future)
+**From the store** — coming soon on [addons.mozilla.org](https://addons.mozilla.org)
 
-The extension will be available on the Firefox Add-ons store once reviewed and approved.
+## Keyboard Shortcuts
 
-## Usage
-
-1. **Access Controls**: Click the media controller icon in the toolbar
-2. **Play/Pause**: Click the play/pause button or use `Ctrl+Shift+Space`
-3. **Seek**: Use the ±10s buttons or shortcuts (`Ctrl+Shift+,` and `Ctrl+Shift+.`)
-4. **Scrub**: Click anywhere on the progress bar to jump to that position
-5. **Volume**: Use the volume slider or mute button
-6. **Navigate**: Click the link button to switch to the media tab
-
-## Supported Sites
-
-The extension works with any website that uses HTML5 `<audio>` or `<video>` elements, including:
-
-- YouTube & YouTube Music
-- Spotify Web Player
-- SoundCloud
-- Netflix, Hulu, Prime Video
-- Podcast sites
-- News sites with video content
-- Any site with embedded media
-
-## Architecture
-
-### Components
-
-- **Background Script** (`background.js`): Session management and message routing
-- **Content Script** (`mediaAgent.js`): Media element detection and control
-- **Popup Interface** (`popup.html/js/css`): User interface for media control
-
-### Key Features
-
-- **Automatic Detection**: Finds audible tabs and injects media agents
-- **Smart Element Selection**: Chooses the best media element per tab
-- **Throttled Updates**: Efficient progress tracking without performance impact
-- **Media Session Integration**: Uses Web API metadata when available
+| Action | Shortcut |
+|---|---|
+| Play / Pause | `Ctrl+Shift+Space` |
+| Seek forward 10s | `Ctrl+Shift+.` |
+| Seek back 10s | `Ctrl+Shift+,` |
 
 ## Permissions
 
-The extension requires these permissions:
+| Permission | Why |
+|---|---|
+| `tabs` | Detect audible tabs |
+| `scripting` | Inject media agent into tabs |
+| `storage` | Save preferences |
+| `<all_urls>` | Work on any media site |
 
-- `tabs`: To detect audible tabs and manage playback
-- `scripting`: To inject content scripts into media tabs
-- `storage`: To save user preferences
-- `activeTab`: To interact with the current tab
-- `<all_urls>`: To work with media on any website
+## Known Limitations
 
-## Privacy
-
-- **No Data Collection**: All processing happens locally in your browser
-- **No Network Access**: The extension doesn't send any data to external servers
-- **Minimal Storage**: Only user preferences are stored locally
-
-## Development
-
-### Project Structure
-
-```
-Firefox-Media-Controller/
-├── manifest.json          # Extension manifest
-├── background.js          # Background service worker
-├── mediaAgent.js          # Content script for media control
-├── popup.html            # Popup interface
-├── popup.js              # Popup functionality
-├── popup.css             # Popup styling
-├── icons/                # Extension icons
-└── README.md             # This file
-```
-
-### Building
-
-No build process required - this is a standard WebExtension that runs directly in Firefox.
-
-### Testing
-
-1. Load the extension in Firefox
-2. Open multiple tabs with different media content
-3. Test controls, keyboard shortcuts, and edge cases
-4. Verify compatibility with various video/audio sites
-
-## Troubleshooting
-
-### Media Not Detected
-
-- Ensure the tab is audible (playing sound)
-- Some sites may delay media element creation
-- Refresh the tab and try again
-
-### Controls Not Working
-
-- Check if the media supports seeking (some live streams don't)
-- Verify the site doesn't override media controls
-- Try refreshing both the media tab and popup
-
-### Performance Issues
-
-- The extension throttles updates to minimize impact
-- Close unused media tabs to reduce overhead
-- Restart Firefox if issues persist
+- DRM-protected content (Netflix, etc.) has limited seek support
+- Live streams don't support seeking by design
+- Suspended background tabs need a manual refresh to reconnect
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly with different sites
-5. Submit a pull request
+PRs are welcome. Please test against YouTube, Spotify Web, and SoundCloud before submitting.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Roadmap
-
-### Upcoming Features
-
-- Picture-in-Picture integration
-- Playback speed control
-- Per-site volume memory
-- Enhanced keyboard shortcuts
-- Mini-player sidebar
-- Site-specific features (YouTube next/prev, etc.)
-
-### Known Limitations
-
-- DRM content may have limited control options
-- Some sites may override native media controls
-- Live streams may not support seeking
-- Background suspended tabs need manual refresh
-
-## Changelog
-
-### v0.1.0 (Current)
-
-- Initial release
-- Basic media detection and control
-- Popup interface with play/pause, seek, volume
-- Keyboard shortcuts
-- Multi-tab support
-- Firefox Manifest V3 compatibility
+MIT
