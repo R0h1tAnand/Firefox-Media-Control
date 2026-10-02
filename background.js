@@ -20,7 +20,7 @@ class MediaSessionManager {
     this.ports = new Set(); // connected popup ports
     this.lastActiveSessionId = null;
     this.lastBroadcastTimestamps = new Map(); // sessionId -> timestamp
-    
+
     this.init();
   }
 
@@ -28,19 +28,19 @@ class MediaSessionManager {
     // Listen for tab updates to detect audible tabs
     browserAPI.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       console.log('Tab updated:', tabId, 'changeInfo:', changeInfo);
-      
+
       if (changeInfo.audible !== undefined) {
         this.handleTabAudibleChange(tab);
       }
-      
+
       // Also check when page status changes to complete for music sites
       if (changeInfo.status === 'complete' && tab.url) {
         const isMusicSite = tab.url.includes('spotify.com') ||
-                           tab.url.includes('youtube.com') ||
-                           tab.url.includes('soundcloud.com') ||
-                           tab.url.includes('music.youtube.com');
+          tab.url.includes('youtube.com') ||
+          tab.url.includes('soundcloud.com') ||
+          tab.url.includes('music.youtube.com');
         const isDenied = MediaSessionManager.DENIED_SITES.some(d => tab.url.includes(d));
-        
+
         if (isMusicSite && !isDenied) {
           console.log('Music site loaded, injecting agent:', tab.url);
           setTimeout(() => this.injectMediaAgent(tabId), 1000);
@@ -73,10 +73,10 @@ class MediaSessionManager {
 
     // Initial scan for audible tabs
     this.scanAudibleTabs();
-    
+
     // Also scan for music sites that might not be audible yet
     this.scanMusicSites();
-    
+
     // Periodic scan for missed audible tabs
     setInterval(() => {
       console.log('Periodic scan for audible tabs...');
@@ -99,7 +99,7 @@ class MediaSessionManager {
     try {
       console.log('Scanning for music sites...');
       const allTabs = await browserAPI.tabs.query({});
-      
+
       for (const tab of allTabs) {
         if (!tab.url) continue;
         const isDenied = MediaSessionManager.DENIED_SITES.some(d => tab.url.includes(d));
@@ -121,7 +121,7 @@ class MediaSessionManager {
 
   async handleTabAudibleChange(tab) {
     console.log('Tab audible change detected:', tab.id, 'audible:', tab.audible, 'url:', tab.url);
-    
+
     if (tab.audible) {
       // Skip voice-chat / conferencing sites that produce audio but not media content
       if (tab.url && MediaSessionManager.DENIED_SITES.some(d => tab.url.includes(d))) {
@@ -140,7 +140,7 @@ class MediaSessionManager {
         tab.url.includes('soundcloud.com') ||
         tab.url.includes('music.youtube.com')
       );
-      
+
       if (!isMusicSite) {
         console.log('Removing sessions for non-audible, non-music tab:', tab.id);
         this.removeSessionsForTab(tab.id);
@@ -153,7 +153,7 @@ class MediaSessionManager {
   async injectMediaAgent(tabId) {
     try {
       console.log('Attempting to inject media agent into tab:', tabId);
-      
+
       // Check if agent is already injected
       const results = await browserAPI.scripting.executeScript({
         target: { tabId, allFrames: true },
@@ -162,7 +162,7 @@ class MediaSessionManager {
 
       const alreadyInjected = results.some(result => result.result === true);
       console.log('Agent already injected?', alreadyInjected);
-      
+
       if (!alreadyInjected) {
         console.log('Injecting media agent script...');
         await browserAPI.scripting.executeScript({
@@ -214,7 +214,7 @@ class MediaSessionManager {
 
   updateSession(sessionData, tabId, frameId) {
     const sessionId = `${tabId}:${frameId}`;
-    
+
     // Get tab info for the session
     browserAPI.tabs.get(tabId).then(tab => {
       const prev = this.sessions.get(sessionId);
@@ -315,7 +315,7 @@ class MediaSessionManager {
   async forwardControlCommand(command) {
     const { sessionId, cmd, ...params } = command;
     const session = this.sessions.get(sessionId);
-    
+
     if (!session) {
       console.error('Session not found:', sessionId);
       return;
@@ -337,7 +337,7 @@ class MediaSessionManager {
 
   handleCommand(command) {
     const session = this.lastActiveSessionId ? this.sessions.get(this.lastActiveSessionId) : null;
-    
+
     if (!session) {
       console.log('No active session for command:', command);
       return;
@@ -404,6 +404,9 @@ class MediaSessionManager {
 }
 
 // Initialize the session manager
-const sessionManager = new MediaSessionManager();
-
-console.log('Global Media Controller background script loaded');
+try {
+  const sessionManager = new MediaSessionManager();
+  console.log('Global Media Controller background script loaded');
+} catch (e) {
+  console.error('Fatal error initializing MediaSessionManager:', e);
+}
