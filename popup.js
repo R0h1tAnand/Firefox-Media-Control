@@ -68,22 +68,31 @@ class MediaControllerPopup {
         this.updateDisplay();
         break;
 
-      case 'SESSION_UPDATED':
-        // If we have a recent optimistic update (within 500ms), ignore the background state for paused
-        // to prevent flickering if the background is slightly delayed
+      case 'SESSION_UPDATED': {
+        // Track previous paused state to decide if sort order needs updating
+        const prev = this.sessions.get(message.session.id);
+        const prevPaused = prev ? prev.state.paused : true;
+
+        // If we have a recent optimistic update (within 1000ms), keep our optimistic
+        // pause state but update everything else (time, volume, etc)
         const optState = this.optimisticStates.get(message.session.id);
         if (optState && (Date.now() - optState.timestamp < 1000)) {
-          // Keep our optimistic pause state, but update everything else (time, volume, etc)
           message.session.state.paused = optState.paused;
         } else {
-          // Clear old optimistic state
           this.optimisticStates.delete(message.session.id);
         }
 
         this.sessions.set(message.session.id, message.session);
+
+        // Targeted DOM update — no full re-render, no appendChild moves
         this.updateSessionCard(message.session);
-        this.updateDisplay();
+
+        // Re-sort using CSS order (no DOM moves) only when play-state changes
+        if (prevPaused !== message.session.state.paused) {
+          this.updateSortOrder();
+        }
         break;
+      }
 
       case 'SESSION_REMOVED':
         this.sessions.delete(message.sessionId);
@@ -108,45 +117,49 @@ class MediaControllerPopup {
   }
 
   renderSessions(sessions) {
-    // Basic diffing to avoid full re-render
-    // For now, if count matches, we blindly update. If not, re-render all.
-    // Optimization: Just check if IDs exist.
+    // Diff-based render: only add/remove cards, never move existing ones.
+    // Sort order is managed via CSS flexbox `order` property to avoid
+    // DOM detach/reattach which would reset active CSS transitions (flicker fix).
     const container = this.sessionsList;
-    const existingIds = new Set(Array.from(container.children).map(c => c.dataset.sessionId));
     const newIds = new Set(sessions.map(s => s.id));
 
-    // Remove old
+    // Remove stale cards
     for (const child of Array.from(container.children)) {
       if (!newIds.has(child.dataset.sessionId)) {
         child.remove();
       }
     }
 
-    // Sort: playing sessions first, then by lastActiveAt
-    sessions.sort((a, b) => {
-      const aPlaying = a.state && !a.state.paused ? 1 : 0;
-      const bPlaying = b.state && !b.state.paused ? 1 : 0;
-      if (bPlaying !== aPlaying) return bPlaying - aPlaying;
-      return b.lastActiveAt - a.lastActiveAt;
-    });
-
-    // Add/Moved
+    // Add new cards (existing cards are never moved)
     for (const session of sessions) {
       let card = container.querySelector(`[data-session-id="${session.id}"]`);
       if (!card) {
         card = this.createSessionCard(session);
         container.appendChild(card);
       } else {
-        // Re-order if needed (appendChild moves it to end)
-        // But complex re-ordering might be overkill, let's just append to maintain sort order
-        container.appendChild(card);
-        // Update content is handled by updateSessionCard called separately or here?
-        // We should ensure content is fresh.
-        // updateSessionCard is called by SESSION_UPDATED.
-        // But initial render needs data.
+        // Ensure content is up-to-date for cards that pre-exist
         this.updateSessionCardDOM(card, session);
       }
     }
+
+    // Apply sort order via CSS without touching DOM structure
+    this.updateSortOrder();
+  }
+
+  // Re-orders session cards using CSS flexbox `order` — no DOM moves,
+  // so CSS transitions on existing cards are never interrupted.
+  updateSortOrder() {
+    const sessions = Array.from(this.sessions.values());
+    sessions.sort((a, b) => {
+      const aPlaying = a.state && !a.state.paused ? 1 : 0;
+      const bPlaying = b.state && !b.state.paused ? 1 : 0;
+      if (bPlaying !== aPlaying) return bPlaying - aPlaying;
+      return b.lastActiveAt - a.lastActiveAt;
+    });
+    sessions.forEach((session, index) => {
+      const card = this.sessionsList.querySelector(`[data-session-id="${session.id}"]`);
+      if (card) card.style.order = index;
+    });
   }
 
   // Parse title into { title, artist } trying to be smart about " - " separators
@@ -241,6 +254,11 @@ class MediaControllerPopup {
     }
   }
 
+  removeSessionCard(sessionId) {
+    const card = this.sessionsList.querySelector(`[data-session-id="${sessionId}"]`);
+    if (card) card.remove();
+  }
+
   updateSessionCardDOM(card, session) {
     // Logic to update DOM elements efficiently
     const { title, artist } = this.parseMetadata(session.title);
@@ -281,6 +299,11 @@ class MediaControllerPopup {
     // Play/Pause Button
     const playBtn = card.querySelector('.toggle-play-btn');
     const isPaused = session.state.paused;
+
+    // Toggle .playing class — drives the accent-color on the progress fill
+    // via CSS (.session-card.playing .progress-fill) instead of :hover,
+    // which was causing the hover-flicker when JS mutated style.width mid-transition.
+    card.classList.toggle('playing', !isPaused);
     const playIcon = `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M8 5v14l11-7z"/></svg>`;
     const pauseIcon = `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
 

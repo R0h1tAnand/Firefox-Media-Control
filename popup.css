@@ -135,6 +135,13 @@ input:checked+.slider:before {
     padding: 8px 16px;
 }
 
+/* Sessions list — flex container so CSS `order` can reorder cards
+   without any DOM detach/reattach (which would reset hover transitions) */
+.sessions-list {
+    display: flex;
+    flex-direction: column;
+}
+
 .content::-webkit-scrollbar {
     width: 8px;
 }
@@ -349,11 +356,18 @@ input:checked+.slider:before {
     width: 0%;
     transition: width 0.1s linear;
     /* Smooth linear update for progress */
+    /* Promote to its own compositor layer so frequent JS width mutations
+       don't trigger a style recalc that fights with the card hover transition */
+    will-change: width;
 }
 
-.session-card:hover .progress-fill {
+/* Progress fill turns accent when media is actively playing.
+ * Keyed off a JS-toggled .playing class instead of :hover so that
+ * frequent JS width mutations don't trigger a mid-transition style
+ * recalc that conflicts with the card's hover background transition
+ * (the root cause of the hover-flicker bug). */
+.session-card.playing .progress-fill {
     background: var(--accent);
-    /* Turn green on hover like Spotify */
 }
 
 .progress-handle {
